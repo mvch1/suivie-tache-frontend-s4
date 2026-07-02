@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String  @id @default(uuid())
+  name      String
+  username  String  @unique
+  email     String  @unique
+  image_url String?
+
+  projects      User_Project[]
+  tasks         User_Task[]
+  ownedProjects Projet[]       @relation("Owner")
+
+  receivedNotifications Notification[] @relation("ReceivedNotifications")
+  sentNotifications     Notification[] @relation("SentNotifications")
+}
+
+model Projet {
+  id          String    @id @default(uuid())
+  title       String
+  owner_id    String    @map("ownerId")
+  created_at  DateTime  @default(now())
+  description String?   @db.Text
+  deadline    DateTime?
+
+  tasks         Task[]
+  users         User_Project[]
+  owner         User           @relation("Owner", fields: [owner_id], references: [id], onDelete: Cascade)
+  notifications Notification[] @relation("ProjectNotifications")
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  project_id  String   @map("projectId")
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+  completed   Boolean  @default(false)
+
+  users         User_Task[]
+  project       Projet         @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  notifications Notification[] @relation("TaskNotifications")
+}
+
+model User_Project {
+  id         String @id @default(uuid())
+  user_id    String
+  project_id String
+  role       String
+
+  user    User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  project Projet @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, project_id]) // Ensures a user can join a project only once
+}
+
+model User_Task {
+  id      String @id @default(uuid())
+  user_id String
+  task_id String
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, task_id]) // Ensures a user is assigned to a task only once
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+enum NotificationType {
+  GENERAL
+  REQUEST
+}
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  lue       Boolean  @default(false)
+  dateEnvoi DateTime @default(now())
+  notificationType NotificationType @default(GENERAL)
+  requestStatus    RequestStatus?
+  destinataireId String
+  proprietaireId String
+  tacheId        String? @map("Taches_id")
+  projetId       String? @map("Projets_id")
+  projet         Projet? @relation("ProjectNotifications", fields: [projetId], references: [id])
+  destinataire   User    @relation("ReceivedNotifications", fields: [destinataireId], references: [id])
+  proprietaire   User    @relation("SentNotifications", fields: [proprietaireId], references: [id])
+  tache          Task?   @relation("TaskNotifications", fields: [tacheId], references: [id])
+}
